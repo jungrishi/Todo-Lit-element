@@ -1,10 +1,12 @@
 import { LitElement, html } from "lit-element";
-
-const Visibilityfilters = {
-  SHOW_ALL: "All",
-  SHOW_ACTIVE: "Active",
-  SHOW_COMPLETED: "Completed",
-};
+import store from "../redux/store";
+import { Visibilityfilters } from "../redux/reducer/reducer";
+import {
+  addTodo,
+  updateTodoStatus,
+  updateFilter,
+  clearCompleted,
+} from "../redux/action";
 
 class TodoView extends LitElement {
   static get properties() {
@@ -20,22 +22,23 @@ class TodoView extends LitElement {
     this.todos = [];
     this.filter = Visibilityfilters.SHOW_ALL;
     this.item = "";
+
+    store.subscribe(() => {
+      let data = store.getState();
+      console.log(data);
+      this.todos = data.todos.todos;
+      this.filter = data.todos.filter;
+    });
   }
 
   addTodo() {
-    if (this.item) {
-      this.todos = [
-        ...this.todos,
-        {
-          item: this.item,
-          complete: false,
-        },
-      ];
+    if (this.item.trim().length > 1) {
+      store.dispatch(addTodo(this.item));
       this.item = "";
     }
   }
 
-  updateTodo(e) {
+  inputHandler(e) {
     this.item = e.target.value;
   }
 
@@ -49,40 +52,39 @@ class TodoView extends LitElement {
       this.addTodo();
     }
   }
-
-  updateTodoStatus(updatedTodo, complete) {
-    let filteredTodo = this.todos.map(todo => {
-      return todo === updatedTodo ? { ...todo, complete } : todo;
-    });
-    this.todos = filteredTodo;
+  /**
+   *
+   * @param {Number} id
+   * @param {Boolean} complete checked value
+   */
+  updateTodoStatus(id, complete) {
+    store.dispatch(updateTodoStatus(id, complete));
   }
 
   filterChanged(e) {
-    console.log(e.target.checked);
-    this.filter = e.target.value;
+    store.dispatch(updateFilter(e.target.value));
   }
 
   applyFilter(todos) {
-    console.log(this.filter);
     switch (this.filter) {
       case Visibilityfilters.SHOW_ACTIVE:
-        return todos.filter(todo => !todo.complete);
+        return todos.filter(todo => !todo.isCompleted);
       case Visibilityfilters.SHOW_COMPLETED:
-        return todos.filter(todo => todo.complete);
+        return todos.filter(todo => todo.isCompleted);
       default:
         return todos;
     }
   }
 
   clearCompleted() {
-    this.todos = this.todos.filter(todo => !todo.complete);
+    store.dispatch(clearCompleted());
   }
 
   render() {
     return html`
       <div class="input-layout" @keyup="${this.eListener}">
       <input type="text" placeholder="Add TODO" .value="${this.item ||
-        ""}" @input="${this.updateTodo}"></input>
+        ""}" @input="${this.inputHandler}"></input>
       <button type="submit" @click ="${this.addTodo}" >Submit</button>
     </div>
 
@@ -91,9 +93,10 @@ class TodoView extends LitElement {
         todo => html`
           <li class="todo-item">
             <input type="checkbox"
-            @change="${e =>
-              this.updateTodoStatus(todo, e.target.checked)}"            
-            ?checked="${todo.complete}">
+            @change="${e => {
+              this.updateTodoStatus(todo.id, e.target.checked);
+            }}"            
+            ?checked="${todo.isCompleted}">
             ${todo.item}
           </input>
           </li>
@@ -108,7 +111,6 @@ class TodoView extends LitElement {
       `
       )}  
       </form>
-
       <button type="submit" @click="${this.clearCompleted}">
         Clear Completeds
       </button>
